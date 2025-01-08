@@ -5,6 +5,7 @@ on: # Vai ser executado quando
     branches: ["main"]
   pull_request: # Quando for criado um pull request para branch main
     branches: ["main"]
+  workflow_dispatch: # Para Iniciar o workflow de forma manual
 
 jobs:
   build:
