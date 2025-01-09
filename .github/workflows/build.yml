@@ -21,10 +21,17 @@ jobs:
         with:
          dotnet-version: '8.x'
         
-      - name: Build
+      - name: Build and Test
         run: |
           dotnet restore ./src/Todo.Api.sln
           dotnet build --no-restore ./src/Todo.Api.sln
+          dotnet test ./src/Todo.Api.sln --no-restore --no-build --logger trx --results-directory "TestResults"
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: TestResults #pasta onde se encontra os artefatos gerados
 
       - name: Setup Node.Js
         uses: actions/setup-node@v4 # Obtem sempre a ultima versao da tag 4
