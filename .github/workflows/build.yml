@@ -8,6 +8,23 @@ on: # Vai ser executado quando
   workflow_dispatch: # Para Iniciar o workflow de forma manual
 
 jobs:
+
+  versionamento:
+    runs-on: ubuntu-latest
+    name: Versionamento
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@4
+        with: 
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: codacy/git-version@2.8.0
+        with:
+          release-branch: main #branch principal
+          prefix: v #prefixo da versao no casao v1.0.0 exemplo
+
   build:
     runs-on: ubuntu-latest
     name: Build Project
