@@ -58,11 +58,11 @@ jobs:
         
       - name: Build
         run: |
-          dotnet build --no-restore ./src/Todo.Api.sln
+          dotnet build --no-restore --configuration Release ./src/Todo.Api.sln
 
       - name: Test
         run: |
-            dotnet test ./src/Todo.Api.sln --no-restore --no-build --logger trx --results-directory "TestResults"          
+            dotnet test --no-restore --no-build ./src/Todo.Api.sln --configuration Release --logger trx --results-directory "TestResults"          
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
@@ -71,28 +71,17 @@ jobs:
           path: TestResults #pasta onde se encontra os artefatos gerados
 
   frontend-build:
-    if: false
+    needs: versionamento #depende da conclusao do job de versionamento para ser executado
     runs-on: ubuntu-latest
-    name: Build Project 
+    name: Fronend Build and Test
+    defaults:
+      run:
+        working-directory: ./src/web
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
 
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v4
-        with:
-         dotnet-version: '8.x'
-        
-      - name: Build and Test
-        run: |
-          dotnet restore ./src/Todo.Api.sln
-          dotnet build --no-restore ./src/Todo.Api.sln
-          dotnet test ./src/Todo.Api.sln --no-restore --no-build --logger trx --results-directory "TestResults" 
-      - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dotnet-test-results
-          path: TestResults #pasta onde se encontra os artefatos gerados  
       - name: Setup Node.Js
         uses: actions/setup-node@v4 # Obtem sempre a ultima versao da tag 4
         with:
@@ -101,5 +90,14 @@ jobs:
       - name: Install dependencies
         working-directory: ./src/web
         run: |
-          npm install
-          npm run build            
+          npm ci
+
+      - name: Test
+        working-directory: ./src/web
+        run: |
+          npm run lint
+            
+      - name: Build
+        working-directory: ./src/web
+        run: |
+          npm run build              
