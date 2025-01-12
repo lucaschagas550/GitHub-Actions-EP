@@ -155,6 +155,9 @@ jobs:
   dependency-check:
     needs: versionamento
     runs-on: ubuntu-latest
+    permissions: #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
+      contents: read
+      pull-requests: write
     
     steps:
     - name: Checkout code
