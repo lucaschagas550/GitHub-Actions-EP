@@ -107,6 +107,7 @@ jobs:
         run: |
           npm run build
 
+#Lint permite verificar se o codigo esta dentro do padrao com nenhuma inconsistência, sinalizar erros de programação, erros estilísticos, bugs e construções suspeitas     
   backend-lint:
     needs: versionamento
     runs-on: ubuntu-latest
@@ -125,6 +126,7 @@ jobs:
         VALIDATE_YAML: "true"
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+#Lint permite verificar se o codigo esta dentro do padrao com nenhuma inconsistência, sinalizar erros de programação, erros estilísticos, bugs e construções suspeitas      
   frontend-lint:
     needs: [ versionamento ] #para mais de uma dependencia passar os nomes em um array frontend-build-and-test
     runs-on: ubuntu-latest
@@ -152,6 +154,7 @@ jobs:
       run: |
         npm run lint
 
+#Verifica se existe alguma dependencia com falha de seguranca        
   dependency-check:
     needs: versionamento
     runs-on: ubuntu-latest
@@ -167,4 +170,60 @@ jobs:
       uses: actions/dependency-review-action@v4
       with:
         comment-summary-in-pr: always #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
-    
+  
+#Permite avaliar o codigo em busca de problemas como token exposto, conexao de banco, pontos de sql injection etc        
+  code-security-check: 
+    needs: versionamento
+    runs-on: ubuntu-latest
+    permissions: 
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    #No meu ponto de vista, eu prefiro nao usar strategy, separar em dois steps um para front e outro para o back
+    strategy:
+      matrix:
+        include:
+          - name: Backend
+            language: csharp
+            build-mode: autobuild
+          - name: Frontend
+            language: javascript
+            build-mode: none
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+
+      - name: Initiliaze Code Quality - ${{ matrix.name }}
+        uses: github/codeql-action/init@v3
+        with: 
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Analyze Code - ${{ matrix.name }}
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+      #Por causa da strategy nao eh preciso aplicar esta parte abaixo, pois ja eh executada na matrix
+      # - name: Initiliaze Code Quality - Backend
+      #   uses: github/codeql-action/init@v3
+      #   with: 
+      #     languages: csharp
+  
+      # - name: Analyze Code - Backend
+      #   uses: github/codeql-action/analyze@v3
+      #   with:
+      #     category: "/language:csharp"   
+
+      # - name: Initiliaze Code Quality - Frontend
+      #   uses: github/codeql-action/init@v3
+      #   with: 
+      #     languages: javascript
+  
+      # - name: Analyze Code - FrontEnd
+      #   uses: github/codeql-action/analyze@v3
+      #   with:
+      #     category: "/language:javascript"          
