@@ -151,3 +151,15 @@ jobs:
       working-directory: ./src/web
       run: |
         npm run lint
+
+  dependency-check:
+    needs: versionamento
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+  
+    - name: Dependency Check
+      uses: actions/dependency-review-action@v4
+    
