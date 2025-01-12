@@ -165,4 +165,6 @@ jobs:
   
     - name: Dependency Check
       uses: actions/dependency-review-action@v4
+      with:
+        comment-summary-in-pr: always #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
     
