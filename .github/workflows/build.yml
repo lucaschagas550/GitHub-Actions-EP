@@ -7,6 +7,11 @@ on: # Vai ser executado quando
     branches: ["main"]
   workflow_dispatch: # Para Iniciar o workflow de forma manual
 
+#Se existir um workflow sendo executado para mesma branch ele vai cancelar o mais antigo, porque ele ja nao tem mais valor e poupa recursos
+concurrency: 
+  group: ${{ github.workflow}}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   versionamento:
@@ -70,7 +75,7 @@ jobs:
           name: dotnet-test-results
           path: TestResults #pasta onde se encontra os artefatos gerados
 
-  frontend-build:
+  frontend-build-and-test:
     needs: versionamento #depende da conclusao do job de versionamento para ser executado
     runs-on: ubuntu-latest
     name: Fronend Build and Test
@@ -92,7 +97,7 @@ jobs:
         run: |
           npm ci
 
-      - name: Test
+      - name: Test #Aqui seria os testes unitarios do frontend, como nao tem esta sendo executado o lint de exemplo
         working-directory: ./src/web
         run: |
           npm run lint
@@ -100,4 +105,49 @@ jobs:
       - name: Build
         working-directory: ./src/web
         run: |
-          npm run build              
+          npm run build
+
+  backend-lint:
+    needs: backend-build-and-test
+    runs-on: ubuntu-latest
+    name: Backend Lint
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+      with:
+        fetch-depth: 0
+
+    - uses: github/super-linter@v6
+      env:
+        DEFAULT_BRANCH: "main"
+        VALIDATE_ALL_CODEBASE: "false"
+        VALIDATE_YAML: "true"
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  frontend-lint:
+    needs: [ versionamento ] #para mais de uma dependencia passar os nomes em um array frontend-build-and-test
+    runs-on: ubuntu-latest
+    name: Frontend Lint
+    defaults:
+      run:
+        working-directory: ./src/web
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+
+    - name: Setup Node.Js
+      uses: actions/setup-node@v4 # Obtem sempre a ultima versao da tag 4
+      with:
+        node-version: '20'
+      
+    - name: Install dependencies
+      working-directory: ./src/web
+      run: |
+        npm ci
+
+    - name: Lint
+      working-directory: ./src/web
+      run: |
+        npm run lint
