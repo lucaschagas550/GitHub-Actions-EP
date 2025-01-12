@@ -108,7 +108,7 @@ jobs:
           npm run build
 
   backend-lint:
-    needs: backend-build-and-test
+    needs: versionamento
     runs-on: ubuntu-latest
     name: Backend Lint
 
