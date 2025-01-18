@@ -17,6 +17,8 @@ jobs:
   versionamento:
     runs-on: ubuntu-latest
     name: Versionamento
+    permissions:
+      contents: write
 
     #numero da versao que vai ser a saida deste job
     outputs:
@@ -51,14 +53,14 @@ jobs:
       - name: Create file version
         run: |  
           echo ${{ steps.version.outputs.version}} > versao.txt
-        if: github.ref == 'refs/heads/main' 
+        # if:github.ref == 'refs/heads/main' 
 
       - name: Upload versao.txt
         uses: actions/upload-artifact@v4
         with:
           name: versao
           path: versao.txt
-        if: github.ref == 'refs/heads/main'
+        # if:github.ref == 'refs/heads/main'
 
   backend-build-and-test:
     needs: versionamento #depende da conclusao do job de versionamento para ser executado
