@@ -47,6 +47,19 @@ jobs:
         if: github.ref == 'refs/heads/main' 
         #So vai ser criado a realese quando estiver sendo executado na branch principal, isto que o if faz
 
+      # Salvando versao como artefato para ser utilizado no arquivo de deploy, porque as variaveis deste yml, nao pode ser usadas no outro  
+      - name: Create file version
+        run: |  
+          echo ${{ steps.version.outputs.version}} > versao.txt
+        if: github.ref == 'refs/heads/main' 
+
+      - name: Upload versao.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: versao
+          path: versao.txt
+        if: github.ref == 'refs/heads/main'
+
   backend-build-and-test:
     needs: versionamento #depende da conclusao do job de versionamento para ser executado
     runs-on: ubuntu-latest
@@ -81,6 +94,13 @@ jobs:
 
       - name: Publish
         run: dotnet publish ./src/api/Todo.Api.csproj --no-restore --no-build --configuration Release --output ./publish
+        
+        #Adiciona a versao da pipeline no arquivo appsettings.json e com isto consigo exibir na aplicacao a versao do projeto, obtendo o valor do appsettings e sendo a mesma da pipeline.
+      - name: Tag published version
+        uses: restackio/update-json-file-action@2.1
+        with:
+            file: ./publish/appsettings.json
+            fields: "{\"MY_APP_VERSION\": \"${{ needs.versionamento.outputs.version }}\"}"
 
       - name: Upload dotnet artifacts
         uses: actions/upload-artifact@v4

@@ -11,10 +11,37 @@ on:
         required: true
         type: string
 
-env:
+env: # Criado ambientes no github, cada ambiente com suas variaveis e valores especificos para cada variavel, exeplo staging ou prod
   DOCKER_IMAGE_VERSION: '${{ vars.DOCKER_CONTAINER_REGISTRY }}/${{ github.repository }}:${{ inputs.version }}'  
 
 jobs:
+
+  versionamento:
+    runs-on: ubuntu-latest
+    outputs:
+      versao: ${{ steps.get-version.outputs.versao }}
+      docker-container-registry: ${{ steps.docker-image-registry.outputs.docker-container-registry }}
+
+    steps:
+      - name: Download versao
+        uses: actions/download-artifact@v4
+        with:
+          name: versao
+          path: ./
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Get version from file
+        id: get-version
+        run: |
+          VALUE=$(cat ./versao.txt) 
+          echo "::notice:: $VALUE"
+          echo "versao=$VALUE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate docker image registry
+        id: docker-image-registry
+        run: |
+          echo "::set-output name=docker-container-registry::${{ vars.DOCKER_CONTAINER_REGISTRY }}/${{ vars.DOCKERHUB_REPOSITORY}}:${{ steps.get-version.outputs.versao }}" >> "$GITHUB_OUTPUT"
+
   deploy-to-azure:
     if: false
     name: Azure
@@ -87,6 +114,7 @@ jobs:
   deploy-to-gcp:
     if: false
     name: GCP
+    # needs: versionamento
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }} 
     permissions:
@@ -96,17 +124,18 @@ jobs:
       - uses: google-github-actions/auth@v2
         id: 'auth'      
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-          project_id: ${{ vars.GCP_PROJECT_ID }}
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}' # secret que deve ser armazenado no repository do git
+          project_id: ${{ vars.GCP_PROJECT_ID }} # variavel de ambiente = vars
 
       - uses: google-github-actions/deploy-cloudrun@v2
         id: 'deploy-to-gcp'
         with:
           service: ${{ vars.GCP_RUN_SERVICE }}
           region: ${{ vars.GCP_RUN_REGION }}          
-          image: ${{ env.DOCKER_IMAGE_VERSION }}
+          image: ${{ env.DOCKER_IMAGE_VERSION }} # docker.io/lucaschagas550/todo-app:latest foi montando na variavel de ambiente DOCKER_IMAGE_VERSION
 
       - name: 'Test the deployment'
         run: |-
           echo "::notice:: ${{ steps.deploy-to-gcp.outputs.url }}/index.html"
           curl -I --fail "${{ steps.deploy-to-gcp.outputs.url }}/index.html"
+ 
