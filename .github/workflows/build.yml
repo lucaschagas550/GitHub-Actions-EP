@@ -36,12 +36,6 @@ jobs:
         with:
           release-branch: main #branch principal
           prefix: v #prefixo da versao no casao v1.0.0 exemplo
-      
-      - name: Remove branch name from version
-        run: |
-          # Remove qualquer parte extra da versão (como '-branch-name')
-          VERSION=$(echo "${{ steps.version.outputs.version }}" | sed -E 's/-[a-zA-Z0-9_-]+$//')
-          echo "VERSION=$VERSION" >> $GITHUB_ENV    
         
       - name: Tag the repository
         env:
