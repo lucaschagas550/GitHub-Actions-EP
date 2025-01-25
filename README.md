@@ -18,6 +18,9 @@ urlFragment: todo-csharp-sql
 name: React Web App with C# API and SQL Database on Azure
 description: A complete ToDo app with C# API and Azure SQL database for storage. Uses Azure Developer CLI (azd) to build, deploy, and monitor
 ---
+
+[![build](https://github.com/lucaschagas550/GitHub-Actions-EP/actions/workflows/build.yml/badge.svg?branch=main-2)](https://github.com/lucaschagas550/GitHub-Actions-EP/actions/workflows/build.yml)
+
 <!-- YAML front-matter schema: https://review.learn.microsoft.com/en-us/help/contribute/samples/process/onboarding?branch=main#supported-metadata-fields-for-readmemd -->
 
 # React Web App with C# API and SQL Database on Azure
