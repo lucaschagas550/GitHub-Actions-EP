@@ -197,6 +197,7 @@ jobs:
 
 #Verifica se existe alguma dependencia com falha de seguranca        
   dependency-check:
+    if: github.event_name == 'pull_request'  # Assegura que este job só será executado em pull requests
     needs: versionamento
     runs-on: ubuntu-latest
     permissions: #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
