@@ -2,9 +2,9 @@ name: Build Project
 
 on: # Vai ser executado quando
   push: # Quando realizar o push para branch main
-    branches: ["main"]
+    branches: ["main", "main-2"]
   pull_request: # Quando for criado um pull request para branch main
-    branches: ["main"]
+    branches: ["main", "main-2"]
   workflow_dispatch: # Para Iniciar o workflow de forma manual
 
 #Se existir um workflow sendo executado para mesma branch ele vai cancelar o mais antigo, porque ele ja nao tem mais valor e poupa recursos
