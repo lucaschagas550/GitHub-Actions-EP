@@ -1,230 +1,309 @@
-name: build
-run-name: Build ${{ github.repository }} by ${{ github.actor }}
+name: Build Project
 
-on:
-  workflow_dispatch:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+on: # Vai ser executado quando
+  push: # Quando realizar o push para branch main
+    branches: ["main", "main-2"]
+  pull_request: # Quando for criado um pull request para branch main
+    branches: ["main", "main-2"]
+  workflow_dispatch: # Para Iniciar o workflow de forma manual
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+#Se existir um workflow sendo executado para mesma branch ele vai cancelar o mais antigo, porque ele ja nao tem mais valor e poupa recursos
+concurrency: 
+  group: ${{ github.workflow}}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  versioning:
-    if: false
+
+  versionamento:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+    name: Versionamento
     permissions:
       contents: write
+
+    #numero da versao que vai ser a saida deste job
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }} # checkout the correct branch name
-          fetch-depth: 0 # fetch the whole repo history
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with: 
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - uses: codacy/git-version@2.8.0
         id: version
         with:
-          release-branch: main
-          prefix: v      
-
+          release-branch: main #branch principal
+          prefix: v #prefixo da versao no casao v1.0.0 exemplo
+        
       - name: Tag the repository
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "::notice:: ${{ steps.version.outputs.version }}"
-          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{github.actor}}@users.noreply.github.com"
+          git config --global user.name "${{github.actor}}"
           git tag -a ${{ steps.version.outputs.version }} -m "Release ${{ steps.version.outputs.version }}"
           git push --tags
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' 
+        #So vai ser criado a realese quando estiver sendo executado na branch principal, isto que o if faz
+
+      # Salvando versao como artefato para ser utilizado no arquivo de deploy, porque as variaveis deste yml, nao pode ser usadas no outro  
+      - name: Create file version
+        run: |  
+          echo ${{ steps.version.outputs.version}} > versao.txt
+        # if:github.ref == 'refs/heads/main' 
+
+      - name: Upload versao.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: versao
+          path: versao.txt
+        # if:github.ref == 'refs/heads/main'
 
   backend-build-and-test:
-    if: false
-    needs: versioning
+    needs: versionamento #depende da conclusao do job de versionamento para ser executado
     runs-on: ubuntu-latest
+    name: Backend Build and Test
+
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout code
+        uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+      
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: ./src/**/packages.lock.json
-
-      - name: Restore packages
-        run: dotnet restore ./src/Todo.Api.sln --locked-mode
-
+         dotnet-version: '8.x'
+      
+      - name: Restore
+        run: |
+          dotnet restore ./src/Todo.Api.sln
+        
       - name: Build
-        run: dotnet build ./src/Todo.Api.sln --no-restore --configuration Release
+        run: |
+          dotnet build --no-restore --configuration Release ./src/Todo.Api.sln
 
       - name: Test
-        run: dotnet test ./src/Todo.Api.sln --no-restore --no-build --configuration Release --logger trx --results-directory "TestResults"
-        if: github.ref != 'refs/heads/main'
+        run: |
+            dotnet test --no-restore --no-build ./src/Todo.Api.sln --configuration Release --logger trx --results-directory "TestResults"          
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: dotnet-test-results
-          path: TestResults
-        if: github.ref != 'refs/heads/main'
+          path: TestResults #pasta onde se encontra os artefatos gerados
 
       - name: Publish
         run: dotnet publish ./src/api/Todo.Api.csproj --no-restore --no-build --configuration Release --output ./publish
-        if: github.ref == 'refs/heads/main'
-
+        
+        #Adiciona a versao da pipeline no arquivo appsettings.json e com isto consigo exibir na aplicacao a versao do projeto, obtendo o valor do appsettings e sendo a mesma da pipeline.
       - name: Tag published version
         uses: restackio/update-json-file-action@2.1
         with:
-          file: ./publish/appsettings.json
-          fields: "{\"MY_APP_VERSION\": \"${{ needs.versioning.outputs.version }}\"}"
+            file: ./publish/appsettings.json
+            fields: "{\"MY_APP_VERSION\": \"${{ needs.versionamento.outputs.version }}\"}"
 
       - name: Upload dotnet artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: api
-          path: ./publish
-        if: github.ref == 'refs/heads/main'
+          name: api #Nome da pasta que sera criada, no caso se chama api
+          path: ./publish #Vai subir como artefato tudo que tem na pasta publish
 
   frontend-build-and-test:
-    if: false
-    needs: versioning
+    needs: versionamento #depende da conclusao do job de versionamento para ser executado
     runs-on: ubuntu-latest
+    name: Frontend Build and Test
     defaults:
       run:
         working-directory: ./src/web
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.Js
+        uses: actions/setup-node@v4 # Obtem sempre a ultima versao da tag 4
         with:
-          node-version: 20.x
-          cache: npm
-          cache-dependency-path: ./src/web
-
-      - name: Build and Test
+          node-version: '20'
+        
+      - name: Install dependencies
+        working-directory: ./src/web
         run: |
           npm ci
+
+      - name: Test #Aqui seria os testes unitarios do frontend, como nao tem esta sendo executado o lint de exemplo
+        working-directory: ./src/web
+        run: |
           npm run lint
+            
+      - name: Build
+        working-directory: ./src/web
+        run: |
           npm run build
-
-      - uses: actions/upload-artifact@v4
+      
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: web
-          path: ./src/web/dist
-        if: github.ref == 'refs/heads/main'
+          name: web #Nome da pasta que sera criada, no caso se chama api
+          path: ./src/web/dist #Vai subir como artefato tudo que tem na pasta dist, que eh onde foi gerado a publicacao          
 
+#Lint permite verificar se o codigo esta dentro do padrao com nenhuma inconsistência, sinalizar erros de programação, erros estilísticos, bugs e construções suspeitas     
   backend-lint:
-    needs: versioning
+    needs: versionamento
     runs-on: ubuntu-latest
+    name: Backend Lint
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # super-linter needs the full git history to get the
-          # list of files that changed across commits
-          fetch-depth: 0
+    - name: Checkout code
+      uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+      with:
+        fetch-depth: 0
 
-      - uses: github/super-linter@v6
-        env:
-          DEFAULT_BRANCH: "main"
-          VALIDATE_ALL_CODEBASE: "false"
-          VALIDATE_YAML: "true"
-          VALIDATE_CSHARP: "true"
-          VALIDATE_JAVASCRIPT_ES: "true"
-          VALIDATE_TYPESCRIPT_ES: "true"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    if: github.ref != 'refs/heads/main'
+    - uses: github/super-linter@v6
+      env:
+        DEFAULT_BRANCH: "main"
+        VALIDATE_ALL_CODEBASE: "false"
+        VALIDATE_YAML: "true"
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  dependency-review:
-    needs: versioning
+#Lint permite verificar se o codigo esta dentro do padrao com nenhuma inconsistência, sinalizar erros de programação, erros estilísticos, bugs e construções suspeitas      
+  frontend-lint:
+    needs: [ versionamento ] #para mais de uma dependencia passar os nomes em um array frontend-build-and-test
     runs-on: ubuntu-latest
+    name: Frontend Lint
+    defaults:
+      run:
+        working-directory: ./src/web
+
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
 
-      - uses: actions/dependency-review-action@v4
-        with:
-          comment-summary-in-pr: always
-          base-ref: main
-          head-ref: main
-    if: github.ref != 'refs/heads/main'
+    - name: Setup Node.Js
+      uses: actions/setup-node@v4 # Obtem sempre a ultima versao da tag 4
+      with:
+        node-version: '20'
+      
+    - name: Install dependencies
+      working-directory: ./src/web
+      run: |
+        npm ci
 
-  code-security-check:
-    needs: versioning
-    name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
-    permissions:
+    - name: Lint
+      working-directory: ./src/web
+      run: |
+        npm run lint
+
+#Verifica se existe alguma dependencia com falha de seguranca        
+  dependency-check:
+    needs: versionamento
+    runs-on: ubuntu-latest
+    permissions: #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
+      contents: read
+      pull-requests: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+  
+    - name: Dependency Check
+      uses: actions/dependency-review-action@v4
+      with:
+        comment-summary-in-pr: always #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
+  
+#Permite avaliar o codigo em busca de problemas como token exposto, conexao de banco, pontos de sql injection etc        
+  code-security-check: 
+    needs: versionamento
+    runs-on: ubuntu-latest
+    permissions: 
       security-events: write
       packages: read
       actions: read
       contents: read
 
+    #No meu ponto de vista, eu prefiro nao usar strategy, separar em dois steps um para front e outro para o back
     strategy:
-      fail-fast: false
       matrix:
         include:
-          - language: csharp
+          - name: Backend
+            language: csharp
+            build-mode: autobuild
+          - name: Frontend
+            language: javascript
             build-mode: none
-          - language: javascript-typescript
-            build-mode: none
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: github/codeql-action/init@v3
-        with:
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4
+
+      - name: Initiliaze Code Quality - ${{ matrix.name }}
+        uses: github/codeql-action/init@v3
+        with: 
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
-      - uses: github/codeql-action/analyze@v3
+      - name: Analyze Code - ${{ matrix.name }}
+        uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{matrix.language}}"
-    if: github.ref != 'refs/heads/main'
+          category: "/language:${{ matrix.language }}"
+
+      #Por causa da strategy nao eh preciso aplicar esta parte abaixo, pois ja eh executada na matrix
+      # - name: Initiliaze Code Quality - Backend
+      #   uses: github/codeql-action/init@v3
+      #   with: 
+      #     languages: csharp
+  
+      # - name: Analyze Code - Backend
+      #   uses: github/codeql-action/analyze@v3
+      #   with:
+      #     category: "/language:csharp"   
+
+      # - name: Initiliaze Code Quality - Frontend
+      #   uses: github/codeql-action/init@v3
+      #   with: 
+      #     languages: javascript
+  
+      # - name: Analyze Code - FrontEnd
+      #   uses: github/codeql-action/analyze@v3
+      #   with:
+      #     category: "/language:javascript"
 
   build-docker-image:
-    if: false
-    needs: [versioning, backend-build-and-test, frontend-build-and-test]
+    needs: [ versionamento, backend-build-and-test, frontend-build-and-test ]
     runs-on: ubuntu-latest
-    env:
-      version: ${{ needs.versioning.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
 
+    env:
+      version: ${{ needs.versionamento.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Obtem sempre a ultima versao da tag 4  
+      
       - uses: actions/download-artifact@v4
         with:
-          path: app
+          path: app #Faz o download dos artefatos com uma pasta chamada app que esta na raiz e dentro tem app/api e app/web, entao a pasta app eh a primeira e unica pasta na raiz e outras dentro da app
           merge-multiple: false
-
-      - name: Build Docker image
+      
+      # vars.DOCKERHUB_REPOSITORY eh uma variavel definida no repositorio do git
+      - name: Build Docker Image
         run: |
-          docker build -t ${{ github.repository }}:${{ env.version }} .
+          docker build -t ${{ vars.DOCKERHUB_REPOSITORY }}:${{ env.version }} .
 
-      - name: Tag Docker image as Latest
+      - name: Tag Docker Image as Latest #Gera a imagem com a tag latest tambem
         run: |
-          docker tag ${{ github.repository }}:${{ env.version }} ${{ github.repository }}:latest
-        if: github.ref == 'refs/heads/main'
+          docker -t ${{ vars.DOCKERHUB_REPOSITORY }}:${{ env.version }} ${{ vars.DOCKERHUB_REPOSITORY }}:latest
+        if: github.ref == 'refs/head/main' 
+      # so vai ser executado se estiver na branch main, para que somente ele gere a versao latest
 
-      - uses: docker/login-action@v3
+      - name: Docker Login
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Run Docker push
-        run: docker push --all-tags ${{ github.repository }}
-
-  deploy:
-    # needs: [versioning, build-docker-image]
-    name: Deploy
-    strategy:
-      matrix:
-        environment: [Staging, Production]
-    uses: ./.github/workflows/deploy.yml
-    with:
-      # version: ${{ needs.versioning.outputs.version }}
-      version: latest
-      environment: ${{ matrix.environment }}
-    secrets: inherit 
-    if: github.ref == 'refs/heads/main'
+      # faz o push de todas as tags latest e da versao atual
+      - name: Docker push
+        run: |
+         docker push --all-tags ${{ vars.DOCKERHUB_REPOSITORY }} 
+      
