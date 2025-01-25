@@ -211,6 +211,7 @@ jobs:
       uses: actions/dependency-review-action@v4
       with:
         comment-summary-in-pr: always #permite o dependency-review-action@v4 criar comentarios no pull-request caso tiver alguma dependencia vulneravel
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
   
 #Permite avaliar o codigo em busca de problemas como token exposto, conexao de banco, pontos de sql injection etc        
   code-security-check: 
